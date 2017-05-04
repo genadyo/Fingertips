@@ -1,10 +1,12 @@
 //
 //  MBFingerTipWindow.m
 //
-//  Copyright 2011-2017 Mapbox, Inc. All rights reserved.
+//  Copyright 2011-2015 Mapbox, Inc. All rights reserved.
 //
 
 #import "MBFingerTipWindow.h"
+
+@import AVFoundation;
 
 // This file must be built with ARC.
 //
@@ -91,6 +93,11 @@
                                              selector:@selector(screenDisconnect:)
                                                  name:UIScreenDidDisconnectNotification
                                                object:nil];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(checkOutputPortType:)
+                                                 name:AVAudioSessionRouteChangeNotification
+                                               object:nil];
 
     // Set up active now, in case the screen was present before the window was created (or application launched).
     //
@@ -101,6 +108,7 @@
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIScreenDidConnectNotification    object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIScreenDidDisconnectNotification object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVAudioSessionRouteChangeNotification object:nil];
 }
 
 #pragma mark -
@@ -177,10 +185,24 @@
     [self updateFingertipsAreActive];
 }
 
+- (void)checkOutputPortType:(NSNotification *)notification
+{
+    [self updateFingertipsAreActive];
+}
+
 - (BOOL)anyScreenIsMirrored
 {
     if ( ! [UIScreen instancesRespondToSelector:@selector(mirroredScreen)])
         return NO;
+    
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    AVAudioSessionRouteDescription *route = audioSession.currentRoute;
+    
+    for (AVAudioSessionPortDescription *output in route.outputs) {
+        if ([[output portType] isEqualToString:AVAudioSessionPortHDMI]) {
+            return YES;
+        }
+    }
 
     for (UIScreen *screen in [UIScreen screens])
     {
@@ -385,17 +407,22 @@
 
 @implementation MBFingerTipOverlayWindow
 
-// UIKit tries to get the rootViewController from the overlay window. Use the Fingertips window instead. This fixes
-// issues with status bar behavior, as otherwise the overlay window would control the status bar.
+// UIKit tries to get the rootViewController from the overlay window.
+// Instead, try to find the rootViewController on some other application window.
+// Fixes problems with status bar hiding, because it considers the overlay window a candidate for controlling the status bar.
 
 - (UIViewController *)rootViewController
 {
-    NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings)
+    for (UIWindow *window in [[UIApplication sharedApplication] windows])
     {
-        return [evaluatedObject isKindOfClass:[MBFingerTipWindow class]];
-    }];
-    UIWindow *mainWindow = [[[[UIApplication sharedApplication] windows] filteredArrayUsingPredicate:predicate] firstObject];
-    return mainWindow.rootViewController ?: [super rootViewController];
+        if (self == window)
+            continue;
+
+        UIViewController *realRootViewController = window.rootViewController;
+        if (realRootViewController != nil)
+            return realRootViewController;
+    }
+    return [super rootViewController];
 }
 
 @end
