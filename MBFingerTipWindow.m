@@ -79,7 +79,7 @@
 - (void)MBFingerTipWindow_commonInit
 {
     self.strokeColor = [UIColor clearColor];
-    self.fillColor = [UIColor colorWithRed:89.0/255.0 green:125.0/255.0 blue:255.0/255.0 alpha:1.0];
+    self.fillColor = [UIColor colorWithRed:34.0/255.0 green:34.0/255.0 blue:32.0/255.0 alpha:1.0];
 
     self.touchAlpha   = 0.5;
     self.fadeDuration = 0.4;
